@@ -16,6 +16,7 @@ import java.util.Base64;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import com.mh.AIAssistant.configuration.TwilioConfig;
 
 
@@ -73,5 +74,17 @@ public class FileStorageService {
             Files.copy(in, filePath, StandardCopyOption.REPLACE_EXISTING);
             return filePath.toString();
         }
+    }
+
+    public String saveMultipartFile(MultipartFile file, String fileName) throws IOException {
+        Path folder = Paths.get(folderPath);
+        if (!Files.exists(folder)) {
+            Files.createDirectories(folder);
+        }
+
+        Path filePath = folder.resolve(fileName);
+        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+        
+        return filePath.toString();
     }
 }

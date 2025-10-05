@@ -1,0 +1,97 @@
+.message-input {
+  width: 100%;
+}
+
+.input-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 24px;
+  padding: 8px 12px;
+  transition: all 0.2s ease;
+}
+
+.input-container:focus-within {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.message-textarea {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  resize: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: #333;
+  min-height: 20px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.message-textarea::placeholder {
+  color: #6c757d;
+}
+
+.message-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.send-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.send-button:hover:not(.disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.send-button:active:not(.disabled) {
+  transform: scale(0.95);
+}
+
+.send-button.disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 768px) {
+  .input-container {
+    padding: 6px 10px;
+  }
+  
+  .send-button {
+    width: 32px;
+    height: 32px;
+  }
+}

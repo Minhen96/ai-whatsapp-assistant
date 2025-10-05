@@ -1,0 +1,129 @@
+.mode-selector {
+  padding: 40px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.mode-selector-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.mode-selector-header h2 {
+  font-size: 2rem;
+  color: #333;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.mode-selector-header p {
+  color: #666;
+  font-size: 1.1rem;
+}
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.mode-card {
+  background: white;
+  border: 2px solid #f0f0f0;
+  border-radius: 16px;
+  padding: 30px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.mode-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--mode-gradient);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.mode-card:hover {
+  border-color: var(--mode-color);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.mode-card:hover::before {
+  transform: scaleX(1);
+}
+
+.mode-icon {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 20px;
+  background: var(--mode-gradient);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: transform 0.3s ease;
+}
+
+.mode-card:hover .mode-icon {
+  transform: scale(1.1);
+}
+
+.mode-card h3 {
+  font-size: 1.3rem;
+  color: #333;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.mode-card p {
+  color: #666;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.mode-arrow {
+  font-size: 1.5rem;
+  color: var(--mode-color);
+  opacity: 0;
+  transition: all 0.3s ease;
+  transform: translateX(-10px);
+}
+
+.mode-card:hover .mode-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+@media (max-width: 768px) {
+  .mode-selector {
+    padding: 20px;
+  }
+  
+  .mode-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  
+  .mode-card {
+    padding: 20px 15px;
+  }
+  
+  .mode-selector-header h2 {
+    font-size: 1.5rem;
+  }
+}

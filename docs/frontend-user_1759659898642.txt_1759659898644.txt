@@ -1,0 +1,109 @@
+e Phone : (+60) 10-232 2096
+Ya p M | Nn | | eC Nn Email : evanyap96@gmail.com
+Address _ : Kepong, KL
+
+SO ft ware En g ineer Interest : Movie, Gym, Basketball
+
+Education
+
+Bachelor of Software Engineering (Honours)
+
+aetna oe Rahman University of Management and Technology 2022 - 2025
+
+¢ Final Year Project in e-commerce system (kotlin + firebase)
+
+Foundation in Engineering
+
+Tunku Abdul Rahman University of Management and Technology 2020 - 2021
+¢ Graduated with CGPA 3.9
+
+Secondary School in Science Stream
+
+Chong Hwa Independent High School 2016 - 2020
+¢ SPM 10A
+
+Work Experiences
+
+Greenstem Business Software Sdn Bhd | Kuala Lumpur
+
+Mobil Web Devel
+eo a } NOV 2024 - MAY 2025
+e Flutter to develop workshop and company internal mobile app.
+¢ React and .NET Core (C#) to develop internal web application.
+
+Projects
+
+Final Year Project
+Pet-Specific E-commerce Mobile App
+¢ Using Kotlin integrating Firebase for real-time database management
+
+¢« Implemented features including product listing, cart management, and authentication.
+
+Internship Projects
+Company Internal Website
+
+¢ Built using React and .NET Core (JWT Authentication & MVC), with MSSQL database.
+¢ Designed interactive UI =and integrated backend services for seamless data flow.
+
+Company Internal Mobile App
+
+¢ Developed using Flutter, ensuring cross-platform performance for both iOS and Android.
+¢ Provided easy access to internal tools and data.
+
+Workshop Accounting Mobile App
+
+¢ Created a Flutter-based mobile app for accounting in a workshop environment.
+¢ Developed features like job sheet transfer, invoice generation, and e-invoice printing.
+Phone : (+60) 10-232 2096
+
+Ya p M i Nn IH] eC Nn Email : evanyap96@gmail.com
+
+Address _: Kepong, KL
+Interest : Movie, Gym, Basketball
+
+Software Engineer
+
+Skills
+
+Software Engineering
+
+Languages
+Backend
+Database
+Frontend
+Mobile
+Cloud
+Blockchain
+
+Tools
+
+OOP, Agile, Software Architecture, Software Testing, HCI
+C#, Java, JavaScript+, Kotlin, Python, C++
+.NET Core (ASP.NET), REST APIs
+
+: MSSQL, Firebase
+
+: React, TypeScript, Tailwind, HTML, CSS
+: Flutter (Dart), Kotlin (Android)
+
+: AWS (basic)
+
+: Solidity
+
+: Github, Claude AI
+
+Language
+
+English
+Chinese
+Cantonese :
+
+Malay
+
+: Intermediate
+
+: Native
+
+Native
+
+: Basic

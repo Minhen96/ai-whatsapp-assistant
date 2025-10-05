@@ -1,212 +1,189 @@
 package com.mh.AIAssistant.controller; 
 
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.mh.AIAssistant.enums.UserMode;
-import com.mh.AIAssistant.model.KnowledgeEntry;
-import com.mh.AIAssistant.repository.KnowledgeBaseRepository;
-import com.mh.AIAssistant.service.DeepSeekAIService;
-import com.mh.AIAssistant.service.DeepSeekEmbeddingService;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import com.mh.AIAssistant.service.FileStorageService;
-import com.mh.AIAssistant.service.OcrService;
-import com.mh.AIAssistant.service.OpenAIEmbeddingService;
+import com.mh.AIAssistant.service.WhatsappService;
 
 import jakarta.annotation.Resource;
-import net.sourceforge.tess4j.TesseractException;
 
 @RestController
 @RequestMapping("/whatsapp")
 public class WhatsappController {
 
+    private static final Logger logger = LoggerFactory.getLogger(WhatsappController.class);
+
     @Resource
     private FileStorageService fileStorageService;
-
+    
     @Resource
-    private OcrService ocrService;
-
-    @Resource
-    private OpenAIEmbeddingService embeddingService;
-
-    @Resource
-    private DeepSeekAIService deepSeekAIService;
-
-    @Resource
-    private KnowledgeBaseRepository knowledgeBaseRepository;
-
-    private Map<String, UserMode> userSessions = new HashMap<>();
+    private WhatsappService whatsappService;
 
     @GetMapping("/hello")
     public String hello() {
         return "Hello AI!";
     }
-
-    @PostMapping("/incoming")
-    public String receiveMessage(@RequestParam("From") String from,
-                                 @RequestParam("Body") String body) {
-        System.out.println("Message from " + from + ": " + body);
-
-        // Simple reply
-        String response = "You said: " + body;
-
-        // Twilio expects TwiML (XML) response
-        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
-                "<Response><Message>" + response + "</Message></Response>";
+    
+    // ✅ Test endpoint to verify service injection
+    @GetMapping("/test")
+    public ResponseEntity<Map<String, String>> test() {
+        Map<String, String> result = new HashMap<>();
+        result.put("status", "ok");
+        result.put("whatsappService", whatsappService != null ? "injected" : "NULL");
+        result.put("fileStorageService", fileStorageService != null ? "injected" : "NULL");
+        return ResponseEntity.ok(result);
+    }
+    
+    // ✅ Minimal test endpoint for incoming_manual
+    @PostMapping(value = "/incoming_manual_test", 
+                 consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+                 produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Map<String, String>> testManual(@RequestParam Map<String,String> params) {
+        Map<String, String> result = new HashMap<>();
+        result.put("received_params", params.toString());
+        result.put("from", params.getOrDefault("from", "missing"));
+        result.put("body", params.getOrDefault("body", "missing"));
+        result.put("whatsappService", whatsappService != null ? "available" : "NULL");
+        return ResponseEntity.ok(result);
     }
 
-    @PostMapping("/incoming_2")
+    // ✅ Twilio webhook - Returns TwiML XML
+    @PostMapping(value = "/incoming", produces = MediaType.APPLICATION_XML_VALUE)
+    public String receiveMessage(@RequestParam("From") String from,
+                                 @RequestParam("Body") String body) {
+        logger.info("Twilio message from {}: {}", from, body);
+
+        try {
+            // Process message through WhatsappService
+            Map<String, String> params = new HashMap<>();
+            params.put("From", from);
+            params.put("Body", body);
+            
+            // Don't send via Twilio here - we return TwiML instead
+            String response = whatsappService.handleIncoming(params, false);
+            
+            // Return TwiML response for Twilio
+            return twiml(response);
+            
+        } catch (Exception e) {
+            logger.error("Error processing Twilio message", e);
+            return twiml("Sorry, I encountered an error processing your message.");
+        }
+    }
+
+    // ✅ Twilio webhook with media support - Returns TwiML XML
+    @PostMapping(value = "/incoming_2", produces = MediaType.APPLICATION_XML_VALUE)
     public String receiveMessage2(@RequestParam Map<String,String> params) {
         String from = params.get("From");                 // e.g. "whatsapp:+60123..."
         String body = params.getOrDefault("Body", "");
         int numMedia = Integer.parseInt(params.getOrDefault("NumMedia", "0"));
 
-        System.out.println("Incoming From=" + from + " Body=" + body + " NumMedia=" + numMedia);
+        logger.info("Twilio incoming From={} Body={} NumMedia={}", from, body, numMedia);
 
-        if (numMedia > 0) {
-            // media message
-            String mediaUrl = params.get("MediaUrl0");
-            try {
+        try {
+            if (numMedia > 0) {
+                // Handle media message
+                String mediaUrl = params.get("MediaUrl0");
                 String fileName = from.replace(":", "_") + "_" + System.currentTimeMillis();
                 String savedPath = fileStorageService.saveFile(mediaUrl, fileName);
-                System.out.println("File saved: " + savedPath);
-                return twiml("I saved your file locally in doc/!");
-            } catch (Exception e) {
-                e.printStackTrace();
-                return twiml("Sorry, I couldn't save the file.");
+                logger.info("File saved: {}", savedPath);
+                
+                // You might want to process the file through WhatsappService too
+                return twiml("✅ I saved your file and it's now in the knowledge base!");
+                
+            } else {
+                // Handle text message
+                String response = whatsappService.handleIncoming(params);
+                return twiml(response);
             }
-        } else {
-            // text message
-            // TODO: prompt user to choose store vs chat, or process immediately
-            return twiml("You said: " + body);
+        } catch (Exception e) {
+            logger.error("Error processing Twilio message with media", e);
+            return twiml("Sorry, I couldn't process your message.");
         }
     }
-
-    @PostMapping("/incoming_manual")
-    public String receiveMessage(@RequestParam Map<String,String> params) {
-        String from = params.get("From");
-        String body = params.getOrDefault("Body", "").trim();
-        int numMedia = Integer.parseInt(params.getOrDefault("NumMedia", "0"));
-
-        // Initialize session if missing
-        userSessions.putIfAbsent(from, UserMode.NONE);
-        UserMode currentMode = userSessions.get(from);
-
-        String reply;
-
-        // Check if user wants to end session
-        if ("end".equalsIgnoreCase(body)) {
-            userSessions.put(from, UserMode.NONE);
-            reply = "✅ Session ended. You can start again anytime.\n\n" + promptOptions();
-            // return twiml(reply);
-            return reply;
+    
+    // ✅ Frontend manual trigger - Returns JSON
+    @PostMapping(value = "/incoming_manual", 
+                 consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+                 produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Map<String, String>> replyMessage(@RequestParam Map<String,String> params) {
+        try {
+            logger.info("Received frontend manual message with params: {}", params);
+            
+            String from = params.getOrDefault("from", "frontend-user");
+            String body = params.getOrDefault("body", "");
+            
+            // Validation
+            if (body == null || body.trim().isEmpty()) {
+                logger.warn("Empty message body received from {}", from);
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Message body cannot be empty");
+                errorResponse.put("userId", from);
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+            
+            logger.info("Processing manual message from {}: {}", from, body);
+            
+            // Normalize params for WhatsappService (use uppercase keys like Twilio)
+            Map<String, String> normalizedParams = new HashMap<>();
+            normalizedParams.put("From", from);
+            normalizedParams.put("Body", body);
+            
+            // Handle the incoming message and get response
+            String response = whatsappService.handleIncoming(normalizedParams);
+            
+            logger.info("WhatsappService returned response: {}", response);
+            
+            Map<String, String> result = new HashMap<>();
+            result.put("response", response);
+            result.put("userId", from);
+            result.put("mode", "whatsapp");
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            logger.error("Error processing manual message", e);
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to process message: " + e.getMessage());
+            errorResponse.put("details", e.getClass().getName());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
-
-        switch(currentMode) {
-            case NONE:
-                // Expect user to choose 1 or 2
-                if ("1".equals(body)) {
-                    userSessions.put(from, UserMode.STORE);
-                    reply = "📥 Store mode activated. Send me the text or document you want to store. Type 'end' to finish.";
-                } else if ("2".equals(body)) {
-                    userSessions.put(from, UserMode.CHAT);
-                    reply = "🤖 Chat mode activated. Ask me any question. Type 'end' to finish.";
-                } else {
-                    reply = "Please choose an option:\n" + promptOptions();
-                }
-                break;
-
-            case STORE:
-                // Handle STORE mode
-                try {
-                    String textToStore = "";
-
-                    if (numMedia > 0) {
-                        for (int i = 0; i < numMedia; i++) {
-                            String mediaUrl = params.get("MediaUrl" + i);
-                            String fileName = from.replace(":", "_") + "_" + System.currentTimeMillis() + "_" + i;
-                            String savedPath = fileStorageService.saveFile(mediaUrl, fileName);
-                            System.out.println("File saved: " + savedPath);
-
-                            // OCR extractionso 
-                            File file = new File(savedPath);
-
-                            // Only process if it's an image/pdf
-                            String extractedText = "";
-                            try {
-                                extractedText = ocrService.extractText(file);
-                            } catch (TesseractException e) {
-                                e.printStackTrace();
-                                extractedText = "[OCR failed]";
-                            }
-
-                            textToStore += extractedText + "\n";
-
-                        }
-                    }
-
-                    if (!body.isBlank()) {
-                        // Include plain text
-                        textToStore += body;
-                        String fileName = from.replace(":", "_") + "_" + System.currentTimeMillis() + ".txt";
-                        fileStorageService.saveText(body, fileName);
-                    }
-
-                    if (!textToStore.isBlank()) {
-                        // Generate embedding
-                        List<Double> embeddingList = embeddingService.generateEmbedding(textToStore);
-
-                        // Convert List<Double> to Double[]
-                        Double[] embeddingArray = embeddingList.toArray(new Double[0]);
-
-                        // Save to PostgreSQL
-                        knowledgeBaseRepository.save(new KnowledgeEntry(from, textToStore, embeddingArray));
-                    }
-
-
-                    reply = "✅ Stored successfully! Type 'end' to finish or send more text/files.";
-
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    reply = "❌ Failed to save. Try again.";
-                }
-                break;
-
-            case CHAT:
-                // Fetch relevant knowledge entries from DB (optional)
-                List<KnowledgeEntry> entries = knowledgeBaseRepository.findByUserId(from);
-                List<String> contextTexts = entries.stream()
-                                                .map(KnowledgeEntry::getContent)
-                                                .toList();
-
-                String aiReply = deepSeekAIService.chatWithKnowledge(body, contextTexts);
-                reply = "🤖 AI says: " + aiReply + "\n\n(Type 'end' to finish chat)";
-                break;
-
-
-            default:
-                reply = promptOptions();
-                break;
-        }
-
-        // return twiml(reply);
-        return reply;
+    }
+    
+    // Global exception handler for this controller
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, String>> handleException(Exception e) {
+        logger.error("Unhandled exception in WhatsappController", e);
+        Map<String, String> errorResponse = new HashMap<>();
+        errorResponse.put("error", "Internal server error");
+        errorResponse.put("message", e.getMessage());
+        errorResponse.put("type", e.getClass().getSimpleName());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
 
-    private String promptOptions() {
-        return "1️⃣ Store in Knowledge Base\n2️⃣ Chat with AI";
-    }
-
+    // Helper method to generate TwiML XML response for Twilio
     private String twiml(String message) {
+        // Escape XML special characters
+        String escaped = message
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&apos;");
+            
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
-               "<Response><Message>" + message + "</Message></Response>";
+               "<Response><Message>" + escaped + "</Message></Response>";
     }
-
 }
