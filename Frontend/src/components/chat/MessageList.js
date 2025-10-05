@@ -1,5 +1,5 @@
 import React from 'react';
-import { useChat } from '../context/ChatContext';
+import { useChat } from '../../context/ChatContext';
 import Message from './Message';
 import LoadingMessage from './LoadingMessage';
 

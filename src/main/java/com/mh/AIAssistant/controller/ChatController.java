@@ -4,12 +4,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.mh.AIAssistant.service.DeepSeekAIService;
-// import removed: DeepSeekEmbeddingService (we reuse OpenAIEmbeddingService for embeddings)
 import com.mh.AIAssistant.service.FileStorageService;
 import com.mh.AIAssistant.service.OcrService;
 import com.mh.AIAssistant.service.OpenAIEmbeddingService;
@@ -27,6 +28,8 @@ import java.io.IOException;
 @RequestMapping("")
 @CrossOrigin(origins = "*")
 public class ChatController {
+
+    private static final Logger logger = LoggerFactory.getLogger(ChatController.class);
 
     @Resource
     private DeepSeekAIService deepSeekAIService;
@@ -83,7 +86,7 @@ public class ChatController {
             return ResponseEntity.ok(result);
 
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error in /chat endpoint", e);
             return ResponseEntity.internalServerError()
                 .body(Map.of("error", "Failed to process request: " + e.getMessage()));
         }
@@ -96,50 +99,92 @@ public class ChatController {
             @RequestParam("userId") String userId,
             @RequestParam(value = "text", required = false) String text) {
         try {
+            logger.info("Store knowledge request - userId: {}, hasFile: {}, hasText: {}", 
+                userId, file != null && !file.isEmpty(), text != null && !text.trim().isEmpty());
+
             StringBuilder aggregated = new StringBuilder();
 
             // 1) Optional raw text (frontend text box)
             if (text != null && !text.trim().isEmpty()) {
+                logger.info("Storing text: {} characters", text.length());
                 whatsappService.storeTextAndEmbed(userId, text.trim());
                 aggregated.append(text.trim()).append("\n");
             }
 
-            // 2) Optional file (OCR -> text -> embed)
+            // 2) Optional file (text/OCR -> embed)
             if (file != null && !file.isEmpty()) {
-                String fileName = userId + "_" + System.currentTimeMillis() + "_" + file.getOriginalFilename();
+                String originalFilename = file.getOriginalFilename();
+                logger.info("Processing file: {}", originalFilename);
+                
+                // Check if file type is supported
+                if (!ocrService.isSupported(originalFilename)) {
+                    logger.warn("Unsupported file type: {}", originalFilename);
+                    return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Unsupported file type: " + originalFilename + 
+                            ". Please upload text files (txt, md, csv, etc.) or images (jpg, png, etc.)"));
+                }
+                
+                String fileName = userId + "_" + System.currentTimeMillis() + "_" + originalFilename;
                 String savedPath = fileStorageService.saveMultipartFile(file, fileName);
 
                 if (savedPath != null) {
                     File savedFile = new File(savedPath);
                     String extractedText = "";
+                    
                     try {
+                        // This will now handle both text files and images intelligently
                         extractedText = ocrService.extractText(savedFile);
+                        logger.info("Extracted {} characters from file", extractedText.length());
+                        
                     } catch (TesseractException e) {
-                        e.printStackTrace();
-                        extractedText = "[OCR extraction failed]";
+                        logger.error("OCR/Text extraction failed for file: {}", originalFilename, e);
+                        return ResponseEntity.internalServerError()
+                            .body(Map.of("error", "Failed to extract text from file: " + e.getMessage()));
+                            
+                    } catch (IllegalArgumentException e) {
+                        logger.error("Invalid file type: {}", originalFilename, e);
+                        return ResponseEntity.badRequest()
+                            .body(Map.of("error", e.getMessage()));
                     }
 
-                    if (!extractedText.trim().isEmpty()) {
+                    if (extractedText != null && !extractedText.trim().isEmpty()) {
                         whatsappService.storeTextAndEmbed(userId, extractedText);
                         aggregated.append(extractedText).append("\n");
+                        logger.info("Successfully stored file content in knowledge base");
+                    } else {
+                        logger.warn("No text could be extracted from file: {}", originalFilename);
+                        return ResponseEntity.ok(Map.of(
+                            "message", "File uploaded but no text could be extracted",
+                            "userId", userId
+                        ));
                     }
                 }
             }
 
             if (aggregated.length() == 0) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Nothing to store: provide text and/or file"));
+                logger.warn("No content to store - neither text nor file provided");
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Nothing to store: provide text and/or file"));
             }
 
             Map<String, String> result = new HashMap<>();
             result.put("message", "✅ Knowledge stored successfully!");
             result.put("userId", userId);
+            result.put("charactersStored", String.valueOf(aggregated.length()));
+            
+            logger.info("Successfully stored knowledge for user {}: {} characters", userId, aggregated.length());
+            
             return ResponseEntity.ok(result);
+            
         } catch (IOException e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to store knowledge: " + e.getMessage()));
+            logger.error("IO error storing knowledge", e);
+            return ResponseEntity.internalServerError()
+                .body(Map.of("error", "Failed to store knowledge: " + e.getMessage()));
+                
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().body(Map.of("error", "Unexpected error: " + e.getMessage()));
+            logger.error("Unexpected error storing knowledge", e);
+            return ResponseEntity.internalServerError()
+                .body(Map.of("error", "Unexpected error: " + e.getMessage()));
         }
     }
 

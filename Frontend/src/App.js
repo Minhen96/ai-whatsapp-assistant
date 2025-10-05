@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import ChatInterface from './components/ChatInterface';
-import ModeSelector from './components/ModeSelector';
+import React, { useState } from 'react';
+import ChatPage from './pages/ChatPage';
+import ModeSelector from './components/ui/ModeSelector';
 import { ChatProvider } from './context/ChatContext';
 import './index.css';
 
@@ -29,7 +29,7 @@ function App() {
           {!currentMode ? (
             <ModeSelector onModeSelect={setCurrentMode} />
           ) : (
-            <ChatInterface
+            <ChatPage
               mode={currentMode}
               onBack={() => setCurrentMode(null)}
               onConnectionChange={setIsConnected}

@@ -1,0 +1,40 @@
+CommandLineRunner 
+Runs code after the application context is fully initialized.
+- Preload data into a database
+- Initialize caches
+- Populate vector stores or AI embeddings (like you are doing)
+Spring Boot allows any number of CommandLineRunner beans, can define anywhere in a @Configuration or @SpringBootApplication.
+Can determine the order by @Order(n) (if CommandLineRunner  in the class not main, put @Order on class Annotation).
+
+
+
+// Class-based CommandLineRunner
+@Component
+@Order(1) // This runs first
+public class xxxInitializer implements CommandLineRunner {
+
+    @Override
+    public void run(String... args) throws Exception {
+	// ...
+    }
+}
+
+// inside main class
+@SpringBootApplication
+public class FlightBookingChatbotApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(FlightBookingChatbotApplication.class, args);
+    }
+
+    @Bean
+    @Order(2) // This runs after class-based runner with @Order(1)
+    CommandLineRunner initDefaultUsers(UserRepository userRepository) {
+        return args -> {
+		// ...
+        };
+    }
+}
+
+
+
