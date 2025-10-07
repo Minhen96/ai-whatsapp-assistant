@@ -1,11 +1,14 @@
 package com.mh.AIAssistant.service;
 
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.util.retry.Retry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.*;
@@ -13,6 +16,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class DeepSeekAIService {
+
+    private static final Logger logger = LoggerFactory.getLogger(DeepSeekAIService.class);
 
     private final WebClient webClient;
 
@@ -35,6 +40,44 @@ public class DeepSeekAIService {
                 .defaultHeader("Authorization", "Bearer " + apiKey)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
+    }
+
+    public String classifyIntent(String userId, String userMessage) {
+        String systemPrompt = """
+            You are an intent classifier. Analyze the user's message and determine if they want to:
+            1. RETRIEVE - They want to see/find/retrieve specific documents from their knowledge base
+            2. CHAT - They want to have a conversation or ask questions about the content
+            
+            Respond with ONLY one word: either "RETRIEVE" or "CHAT"
+            
+            RETRIEVE examples:
+            - "Show me the document about project deadlines"
+            - "Find my notes on machine learning"
+            - "Get me the file I uploaded yesterday"
+            - "What documents do I have about budget?"
+            - "Retrieve the meeting notes from last week"
+            
+            CHAT examples:
+            - "What is machine learning?"
+            - "Explain the project deadline"
+            - "How does this work?"
+            - "Can you summarize this?"
+            - "Tell me about the budget"
+            """;
+        
+        try {
+            String fullPrompt = systemPrompt + "\n\nUser message: " + userMessage;
+            String response = chat(userId, fullPrompt).trim().toUpperCase();
+            
+            // Ensure we only get RETRIEVE or CHAT
+            if (response.contains("RETRIEVE")) {
+                return "RETRIEVE";
+            }
+            return "CHAT";
+        } catch (Exception e) {
+            System.err.println("Error classifying intent, defaulting to CHAT: " + e.getMessage());
+            return "CHAT";
+        }
     }
 
     /**

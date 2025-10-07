@@ -2,7 +2,6 @@ package com.mh.AIAssistant.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Entity
 @Table(name = "knowledge_entries")
@@ -17,7 +16,6 @@ public class KnowledgeEntry {
     @Column(columnDefinition = "TEXT")
     private String content;
 
-    // store as PostgreSQL array
     @Column(
         name = "embedding",
         columnDefinition = "double precision[]"
@@ -25,6 +23,19 @@ public class KnowledgeEntry {
     private Double[] embedding;
 
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    // New fields for file metadata
+    @Column(name = "file_path")
+    private String filePath;  // Store the actual file path on server
+
+    @Column(name = "file_name")
+    private String fileName;  // Original filename
+
+    @Column(name = "file_type")
+    private String fileType;  // mime type or extension
+
+    @Transient
+    private Double similarityScore;
 
     public KnowledgeEntry() {}
 
@@ -34,7 +45,18 @@ public class KnowledgeEntry {
         this.embedding = embedding;
     }
 
-    // getters and setters
+    // Add constructor with file metadata
+    public KnowledgeEntry(String userId, String content, Double[] embedding, 
+                         String filePath, String fileName, String fileType) {
+        this.userId = userId;
+        this.content = content;
+        this.embedding = embedding;
+        this.filePath = filePath;
+        this.fileName = fileName;
+        this.fileType = fileType;
+    }
+
+    // All existing getters/setters...
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -49,4 +71,22 @@ public class KnowledgeEntry {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public Double getSimilarityScore() { return similarityScore; }
+    public void setSimilarityScore(Double similarityScore) { this.similarityScore = similarityScore; }
+
+    // New getters/setters for file metadata
+    public String getFilePath() { return filePath; }
+    public void setFilePath(String filePath) { this.filePath = filePath; }
+
+    public String getFileName() { return fileName; }
+    public void setFileName(String fileName) { this.fileName = fileName; }
+
+    public String getFileType() { return fileType; }
+    public void setFileType(String fileType) { this.fileType = fileType; }
+
+    // Helper method to check if this entry has an associated file
+    public boolean hasFile() {
+        return filePath != null && !filePath.isEmpty();
+    }
 }

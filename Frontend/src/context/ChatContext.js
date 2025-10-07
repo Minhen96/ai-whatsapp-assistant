@@ -61,6 +61,8 @@ export function ChatProvider({ children }) {
     const messageWithDefaults = {
       id: message.id ?? Date.now(),
       timestamp: message.timestamp ?? new Date(),
+      documents: message.documents || [], // Add documents array
+      hasDocuments: message.hasDocuments || false, // Add flag
       ...message,
     };
     dispatch({ type: 'ADD_MESSAGE', payload: messageWithDefaults });

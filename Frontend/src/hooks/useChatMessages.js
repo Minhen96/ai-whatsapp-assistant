@@ -6,7 +6,7 @@ import { sendChatMessage } from '../services/api/chatApi';
 import { sendWhatsAppMessage } from '../services/api/whatsappApi';
 
 export const useChatMessages = (mode) => {
-  const { addMessage, setLoading } = useChat();
+  const { addMessage, setLoading, userId } = useChat();
 
   const handleSendMessage = async (message) => {
     if (!message.trim()) return;
@@ -27,12 +27,24 @@ export const useChatMessages = (mode) => {
         data = await sendChatMessage(message, mode);
       }
 
-      // Add bot response
+      // Add bot response with documents if available
       const botMessage = createMessage(
         data.response || data.message || "Sorry, I couldn't process your request.",
         'bot',
         mode
       );
+
+      // Attach documents if they exist in the response
+      if (data.documents && Array.isArray(data.documents)) {
+        botMessage.documents = data.documents;
+        botMessage.hasDocuments = data.documents.length > 0;
+      }
+
+      // Store userId for downloads
+      if (!botMessage.userId) {
+        botMessage.userId = userId || data.userId;
+      }
+
       addMessage(botMessage);
 
     } catch (error) {

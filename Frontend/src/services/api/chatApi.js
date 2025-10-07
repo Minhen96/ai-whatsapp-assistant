@@ -13,5 +13,14 @@ export const sendChatMessage = async (message, mode, userId = 'frontend-user') =
     throw new Error(`HTTP ${response.status}: ${errorText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  
+  // Return data with documents if available
+  return {
+    response: data.response,
+    documents: data.documents || [],
+    hasDocuments: data.hasDocuments || false,
+    mode: data.mode,
+    userId: data.userId
+  };
 };

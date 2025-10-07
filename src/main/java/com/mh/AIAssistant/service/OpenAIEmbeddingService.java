@@ -36,5 +36,9 @@ public class OpenAIEmbeddingService {
         Map<String, Object> data = ((List<Map<String, Object>>) response.get("data")).get(0);
         return (List<Double>) data.get("embedding");
     }
+
+    public List<Double> getEmbedding(String text) {
+        return generateEmbedding(text);
+    }
 }
 

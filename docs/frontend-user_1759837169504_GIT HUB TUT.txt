@@ -1,0 +1,70 @@
+GIT HUB TUT
+
+master push (new commmit):
+git pull origin master (may need to solve merge conflict)
+git status (will show changes u have made)
+git add . (add the changes u want)
+git commit -m "Description"   (create a version, with a description)
+git push origin master (new version in the branch)
+
+
+
+
+branch:
+git checkout master (navigate to the place to add branch, usually main/master)
+git branch (check existing local branch)
+git branch -a (check all branch)
+git checkout -b branch/branch-name (create and navigate to a new branch)
+git checkout branch/branch-name (navigate to a new branch)
+
+
+
+
+merging branch into master (navigate to the main branch first, then only merge):
+git checkout master
+git merge branch/branch-name
+git push origin master 
+
+
+
+
+squash (merge commits):
+git rebase -i HEAD~N (replace N with number, will show latest N commits)
+Will show interactive editor (list old first), i.e. pick 1234567 First commit
+					   	    pick 89abcde Second commit
+						    pick 456defg Third commit							    pick 749vfnv Fouth commit							    pick 123vdsv Fifth commit							    pick vsdv322 Sixth commit
+Change other to squash command: pick 1234567 First commit
+				squash 89abcde Second commit
+				squash 456defg Third commit							reword 749vfnv Fouth commit							squash 123vdsv Fifth commit							pick vsdv322 Sixth commit
+Git will prompt to insert a new commit desciption for the combined commit one by one, and saved
+- reword: Always ask to edit commit message.
+- pick: Never ask to edit commit message.
+- squash: May ask to edit the final combined commit message.
+
+
+
+
+fetch vs pull:
+git fetch : Get the changes (branches, commits, tags) from the remote repository but does not merge them
+git log origin/master : shows the commit history of the remote master (fetched)
+git pull : Fetches the changes from the remote repository and immediately merges them into your current branch (fetch + merge)
+
+
+
+
+rebase workflow (to get latest origin, and u can solve conflict in your branch):
+option 1:
+git checkout master
+git pull origin master (now u have latest one)
+option 2:
+git fetch origin
+continue (just make sure alr get latest main before):
+git checkout branch/branch-name
+git add .
+git rebase main 
+merge conflict:
+1. git rebase --abort (cancel rebase)
+2. git rebase --continue (continue rebase after solving merge conflict)
+3. git reflog (find the commit before the rebase)
+   git reset --hard <commit-id> (hard reset your branch to that commit)
+

@@ -1,6 +1,7 @@
 package com.mh.AIAssistant.service;
 
 import com.mh.AIAssistant.configuration.TwilioConfig;
+import com.mh.AIAssistant.dto.DocumentInfo;
 import com.mh.AIAssistant.enums.UserMode;
 import com.mh.AIAssistant.model.KnowledgeEntry;
 import com.mh.AIAssistant.repository.KnowledgeBaseRepository;
@@ -8,14 +9,19 @@ import com.twilio.Twilio;
 import com.twilio.rest.api.v2010.account.Message;
 import com.twilio.type.PhoneNumber;
 import net.sourceforge.tess4j.TesseractException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class WhatsappService {
+
+    private static final Logger logger = LoggerFactory.getLogger(WhatsappService.class);
 
     private final TwilioConfig twilioConfig;
     private final FileStorageService fileStorageService;
@@ -23,6 +29,8 @@ public class WhatsappService {
     private final OpenAIEmbeddingService embeddingService;
     private final DeepSeekAIService deepSeekAIService;
     private final KnowledgeBaseRepository knowledgeBaseRepository;
+    private final KnowledgeBaseRepositoryCustom knowledgeBaseRepositoryCustom;
+    private final DocumentService documentService;
 
     // simple in-memory session
     private final Map<String, UserMode> userSessions = new HashMap<>();
@@ -34,7 +42,9 @@ public class WhatsappService {
             OcrService ocrService,
             OpenAIEmbeddingService embeddingService,
             DeepSeekAIService deepSeekAIService,
-            KnowledgeBaseRepository knowledgeBaseRepository
+            KnowledgeBaseRepository knowledgeBaseRepository,
+            KnowledgeBaseRepositoryCustom knowledgeBaseRepositoryCustom,
+            DocumentService documentService
     ) {
         this.twilioConfig = twilioConfig;
         this.fileStorageService = fileStorageService;
@@ -42,6 +52,8 @@ public class WhatsappService {
         this.embeddingService = embeddingService;
         this.deepSeekAIService = deepSeekAIService;
         this.knowledgeBaseRepository = knowledgeBaseRepository;
+        this.knowledgeBaseRepositoryCustom = knowledgeBaseRepositoryCustom;
+        this.documentService = documentService;
 
         Twilio.init(twilioConfig.getAccountSid(), twilioConfig.getAuthToken());
     }
@@ -103,28 +115,185 @@ public class WhatsappService {
     /**
      * Reusable helper for web ChatController: store plain text into docs + DB embeddings
      */
-    public void storeTextAndEmbed(String userId, String text) throws IOException {
-        if (text == null || text.isBlank()) return;
-        // Mirror to docs folder (same artifact path as WA)
-        String fileName = userId.replace(":", "_") + "_" + System.currentTimeMillis() + ".txt";
-        fileStorageService.saveText(text, fileName);
+    public void storeTextAndEmbed(String userId, String text) {
+        storeTextAndEmbed(userId, text, null, null, null);
+    }
 
-        // Generate embedding and persist
-        List<Double> embeddingList = embeddingService.generateEmbedding(text);
-        Double[] embeddingArray = embeddingList.toArray(new Double[0]);
-        knowledgeBaseRepository.save(new KnowledgeEntry(userId, text, embeddingArray));
+    public void storeTextAndEmbed(String userId, String text, String filePath, 
+                                String fileName, String fileType) {
+        try {
+            List<Double> embeddingList = embeddingService.getEmbedding(text);
+            Double[] embeddingArray = embeddingList.toArray(new Double[0]);
+            
+            KnowledgeEntry entry = new KnowledgeEntry(
+                userId, text, embeddingArray, filePath, fileName, fileType
+            );
+            knowledgeBaseRepository.save(entry);
+            
+            logger.info("Stored knowledge entry for user: {} with file: {}", userId, fileName);
+        } catch (Exception e) {
+            logger.error("Error storing text and embedding", e);
+            throw new RuntimeException("Failed to store knowledge entry", e);
+        }
     }
 
     /**
      * Reusable helper for web ChatController: produce AI reply using same knowledge retrieval as WA
      */
-    public String chatReply(String userId, String body) {
-        List<KnowledgeEntry> entries = knowledgeBaseRepository.findByUserId(userId);
-        List<String> context = entries.stream().map(KnowledgeEntry::getContent).toList();
-        
-        // Pass userId for conversation history
-        return deepSeekAIService.chatWithKnowledge(userId, body, context);
+    public String chatReply(String userId, String userMessage) {
+        try {
+            // 1. Classify intent
+            String intent = deepSeekAIService.classifyIntent(userId, userMessage);
+            logger.info("Classified intent for user {}: {}", userId, intent);
+
+            if ("RETRIEVE".equals(intent)) {
+                // User wants to retrieve/find documents
+                List<DocumentInfo> documents = 
+                    documentService.findRelevantDocuments(userId, userMessage);
+                
+                if (documents.isEmpty()) {
+                    return "I couldn't find any relevant documents in your knowledge base matching that query.";
+                }
+
+                // Let AI generate a natural response with document references
+                List<String> contextTexts = documents.stream()
+                    .map(doc -> {
+                        String preview = doc.getContentPreview(300);
+                        String fileInfo = doc.isHasFile() ? 
+                            " [File: " + doc.getFileName() + "]" : "";
+                        return preview + fileInfo;
+                    })
+                    .toList();
+
+                String systemPrompt = String.format(
+                    "The user asked: '%s'\n\n" +
+                    "I found %d relevant document(s) in their knowledge base. " +
+                    "Generate a natural, helpful response that:\n" +
+                    "1. Acknowledges what they're looking for\n" +
+                    "2. Mentions how many relevant documents were found\n" +
+                    "3. Briefly describes what the documents contain\n" +
+                    "4. If files are attached, mention they can click to download them\n\n" +
+                    "Keep it conversational and helpful.",
+                    userMessage,
+                    documents.size()
+                );
+
+                return deepSeekAIService.chatWithKnowledge(userId, systemPrompt, contextTexts);
+
+            } else {
+                // CHAT mode - Answer questions using knowledge base
+                List<Double> queryEmbedding = embeddingService.generateEmbedding(userMessage);
+                if (queryEmbedding == null) {
+                    logger.warn("Failed to generate embedding, using fallback");
+                    return deepSeekAIService.chat(userId, userMessage);
+                }
+
+                // Get similar entries
+                String embeddingStr = queryEmbedding.stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(",", "{", "}"));
+                
+                List<Object[]> rawResults = knowledgeBaseRepository.findSimilarEntriesRaw(
+                    embeddingStr, userId, 5
+                );
+
+                List<String> contextTexts = rawResults.stream()
+                    .filter(row -> {
+                        Double similarity = row[6] != null ? ((Number) row[6]).doubleValue() : 0.0;
+                        return similarity >= 0.7;
+                    })
+                    .map(row -> (String) row[2])
+                    .limit(3)
+                    .toList();
+
+                if (contextTexts.isEmpty()) {
+                    logger.info("No relevant context found, using general knowledge");
+                    return deepSeekAIService.chat(userId, userMessage);
+                }
+
+                logger.info("Found {} relevant context chunks for chat", contextTexts.size());
+                return deepSeekAIService.chatWithKnowledge(userId, userMessage, contextTexts);
+            }
+
+        } catch (Exception e) {
+            logger.error("Error in chatReply for user: {}", userId, e);
+            return "I'm having trouble processing your request right now. Please try again.";
+        }
     }
+
+    public List<DocumentInfo> findRelevantDocuments(String userId, String query) {
+        try {
+            List<Double> queryEmbedding = embeddingService.generateEmbedding(query);
+            if (queryEmbedding == null || queryEmbedding.isEmpty()) {
+                logger.warn("Failed to generate embedding for query");
+                return Collections.emptyList();
+            }
+
+            String embeddingStr = queryEmbedding.stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(",", "{", "}"));
+
+            List<Object[]> rawResults = knowledgeBaseRepository.findSimilarEntriesRaw(
+                    embeddingStr, userId, 20
+            );
+
+            // Use map to group documents by filename (fallback if filePath missing)
+            Map<String, DocumentInfo> uniqueDocs = new HashMap<>();
+
+            for (Object[] row : rawResults) {
+                try {
+                    Long id = ((Number) row[0]).longValue();
+                    String content = (String) row[2];
+                    Double similarity = row[5] != null ? ((Number) row[5]).doubleValue() : 0.0;
+                    String filePath = (String) row[6];
+                    String fileName = (String) row[7];
+                    String fileType = (String) row[8];
+
+                    if (similarity < 0.3)
+                        continue;
+
+                    // Normalize key (use lowercase filename or filePath)
+                    String key = (filePath != null && !filePath.isEmpty())
+                            ? filePath.trim().toLowerCase()
+                            : (fileName != null ? fileName.trim().toLowerCase() : "no_file");
+
+                    // Skip duplicates
+                    DocumentInfo existing = uniqueDocs.get(key);
+                    if (existing == null) {
+                        DocumentInfo doc = new DocumentInfo();
+                        doc.setId(id);
+                        doc.setContent(content);
+                        doc.setSimilarity(similarity);
+                        doc.setFilePath(filePath);
+                        doc.setFileName(fileName);
+                        doc.setFileType(fileType);
+                        doc.setHasFile(filePath != null && !filePath.isEmpty());
+                        uniqueDocs.put(key, doc);
+                    } else {
+                        // Merge content + take max similarity
+                        existing.setContent(existing.getContent() + "\n" + content);
+                        if (similarity > existing.getSimilarity()) {
+                            existing.setSimilarity(similarity);
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.error("Error processing row", e);
+                }
+            }
+
+            List<DocumentInfo> result = new ArrayList<>(uniqueDocs.values());
+
+            logger.info("✅ Found {} unique documents after deduplication (raw count: {})",
+                    result.size(), rawResults.size());
+
+            return result;
+
+        } catch (Exception e) {
+            logger.error("Error finding relevant documents", e);
+            return Collections.emptyList();
+        }
+    }
+
 
     private String handleChatMode(String from, String body) {
         List<KnowledgeEntry> entries = knowledgeBaseRepository.findByUserId(from);

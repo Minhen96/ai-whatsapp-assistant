@@ -1,4 +1,5 @@
 import React from 'react';
+import DocumentList from './DocumentList';
 
 function MessageBubble({ message }) {
   const isUser = message.type === 'user';
@@ -13,6 +14,12 @@ function MessageBubble({ message }) {
           : 'bg-white border border-gray-200 text-gray-900 rounded-bl-md'
       }`}>
         <div className="whitespace-pre-wrap leading-relaxed text-[15px]">{message.content}</div>
+        
+        {/* Show documents if available (only for bot messages) */}
+        {!isUser && message.documents && message.documents.length > 0 && (
+          <DocumentList documents={message.documents} />
+        )}
+        
         {mode && (
           <div className={`mt-1 text-[10px] ${isUser ? 'text-white/70' : 'text-gray-500'}`}>
             {mode === 'chat' ? 'Chat' : mode === 'store' ? 'Store' : mode === 'whatsapp' ? 'WhatsApp' : mode}
@@ -27,5 +34,3 @@ function MessageBubble({ message }) {
 }
 
 export default MessageBubble;
-
-
