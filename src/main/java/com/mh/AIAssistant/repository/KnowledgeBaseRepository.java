@@ -39,7 +39,7 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeEntry, L
             CROSS JOIN query_vec q
             WHERE k.user_id = :userId
         )
-        SELECT id, user_id, content, embedding, created_at, similarity_score, 
+        SELECT id, user_id, content, embedding, created_at, similarity_score,
             file_path, file_name, file_type
         FROM similarities
         WHERE similarity_score IS NOT NULL
@@ -51,4 +51,5 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeEntry, L
         @Param("userId") String userId, 
         @Param("limit") int limit
     );
+
 }

@@ -1,0 +1,96 @@
+Microservice:
+Separate each feature into different Spring Boot project.
+Communicate via REST API / messaging.
+Can be same domain. (or diff) 
+Own code base.
+Independent database. (even diff platform)
+Separate deployment. (so CI/CD is important to speed up and stay consistency)
+Just implement the needed dependencies in each project.
+Independent development, fault tolerance, scaling, maintenance, less coupling.
+
+
+
+How Microservices Work (High-Level Flow)
+1. From frontend → triggers a REST call to "/users/123/cart"
+2. Routes to User Service
+3. User Service fetches product details -> calling Product Service
+4. Product Service queries its DB and returns products -> response back to User Service
+5. User Service assembles response and sends back to Gateway → Client
+
+
+
+How service call another service:
+1. RestTemplate : simple, synchronous HTTP client to call external REST APIs.
+
+RestTemplate restTemplate = new RestTemplate();
+String url = "http://localhost:8081/products";
+
+List<Product> result = restTemplate.getForObject(url, List.class);
+// url: endpoint wanted to call
+// List.class : The Java class to convert the JSON result into
+
+
+2. WebClient : asynchronous, modern
+
+WebClient client = WebClient.create("http://localhost:8081");
+
+List<Product> result = client.get()
+    .uri("/products")
+    .retrieve()
+    .bodyToFlux(Product.class)
+    .collectList()
+    .block();  // sync wait for result
+
+
+3. OpenFeign : Declarative, just write interface, Feign (HTTP client) does the HTTP call
+
+Eureka : Service Registry 
+when UserService needs to call ProductService:
+ProductService → register to Eureka using its spring.application.name (application.yml)
+	       → @EnableEurekaClient at main class
+
+UserService → @EnableEurekaClient & @EnableFeignClients at main class
+	    → ProductClient.getProducts()
+            → FeignInterceptor: "I need to call 'product-service'"
+            → Ask Eureka: "Give me an instance of product-service"
+            → Eureka returns: 192.168.1.10:8081
+            → Feign makes HTTP GET to http://192.168.1.10:8081/products
+            → Gets JSON response
+            → Maps JSON → List<Product>
+
+Code Example:
+1. ProductService register to Eureka with IP & port, application.yml:
+	spring:
+	  application:
+	    name: product-service  # 👈 This must match the FeignClient name
+
+	eureka:
+	  client:
+	    service-url:
+	      defaultZone: http://localhost:8761/eureka
+
+2. UserService also registers to Eureka:
+	spring:
+	  application:
+	    name: user-service
+
+	eureka:
+	  client:
+	    service-url:
+	      defaultZone: http://localhost:8761/eureka
+
+3. Define Feign client interface:
+	@FeignClient(name = "product-service") // Must match product-service’s spring.application.name
+	public interface ProductClient {
+	    @GetMapping("/products")
+	    List<Product> getProducts();
+	}
+
+
+
+
+
+Kafka
+
+
+

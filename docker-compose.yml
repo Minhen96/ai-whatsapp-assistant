@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ai-database
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ai-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_BASE_URL: ${APP_BASE_URL}
+
+      # Database
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      
+      # Twilio
+      TWILIO_ACCOUNTSID: ${TWILIO_ACCOUNTSID}
+      TWILIO_AUTHTOKEN: ${TWILIO_AUTHTOKEN}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER}
+      
+      # API Keys
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      CHATGPT_API_KEY: ${CHATGPT_API_KEY}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./docs:/app/docs
+    networks:
+      - ai-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ai-frontend
+    ports:
+      - "8081:80"
+    networks:
+      - ai-network
+    depends_on:
+      - backend
+
+networks:
+  ai-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

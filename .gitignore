@@ -34,3 +34,5 @@ build/
 
 # Local properties with secrets
 src\main\resources\application-local.properties
+.env
+src/main/resources/application-local.properties

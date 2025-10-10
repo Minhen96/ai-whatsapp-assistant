@@ -184,34 +184,29 @@ public class WhatsappService {
                 // CHAT mode - Answer questions using knowledge base
                 List<Double> queryEmbedding = embeddingService.generateEmbedding(userMessage);
                 if (queryEmbedding == null) {
-                    logger.warn("Failed to generate embedding, using fallback");
+                    logger.warn("Failed to generate embedding, fallback to general chat");
                     return deepSeekAIService.chat(userId, userMessage);
                 }
 
-                // Get similar entries
-                String embeddingStr = queryEmbedding.stream()
-                    .map(String::valueOf)
-                    .collect(Collectors.joining(",", "{", "}"));
-                
                 List<Object[]> rawResults = knowledgeBaseRepository.findSimilarEntriesRaw(
-                    embeddingStr, userId, 5
+                        queryEmbedding.stream().map(String::valueOf).collect(Collectors.joining(",", "{", "}")),
+                        userId, 5
                 );
 
                 List<String> contextTexts = rawResults.stream()
                     .filter(row -> {
-                        Double similarity = row[6] != null ? ((Number) row[6]).doubleValue() : 0.0;
-                        return similarity >= 0.7;
+                        Double sim = row[5] != null ? ((Number) row[5]).doubleValue() : 0.0;
+                        return sim >= 0.7;
                     })
                     .map(row -> (String) row[2])
                     .limit(3)
                     .toList();
 
                 if (contextTexts.isEmpty()) {
-                    logger.info("No relevant context found, using general knowledge");
+                    logger.info("No relevant context found, using general chat");
                     return deepSeekAIService.chat(userId, userMessage);
                 }
 
-                logger.info("Found {} relevant context chunks for chat", contextTexts.size());
                 return deepSeekAIService.chatWithKnowledge(userId, userMessage, contextTexts);
             }
 

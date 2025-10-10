@@ -20,9 +20,8 @@ public class DeepSeekAIService {
     private static final Logger logger = LoggerFactory.getLogger(DeepSeekAIService.class);
 
     private final WebClient webClient;
-
-    @Value("${deepseek.api.key}")
-    private String deepSeekApiKey;
+    private final String deepSeekApiKey;
+    private final String deepSeekApiUrl;
 
     @Value("${deepseek.chat.model:deepseek-chat}")
     private String chatModel;
@@ -33,11 +32,15 @@ public class DeepSeekAIService {
     // Maximum messages to keep in history (to avoid token limits)
     private static final int MAX_HISTORY_SIZE = 10;
 
-    public DeepSeekAIService(@Value("${deepseek.api.url}") String baseUrl,
-                             @Value("${deepseek.api.key}") String apiKey) {
+    public DeepSeekAIService(
+            @Value("${deepseek.api.url}") String apiUrl,
+            @Value("${deepseek.api.key}") String apiKey
+    ) {
+        this.deepSeekApiKey = apiKey;
+        this.deepSeekApiUrl = apiUrl;
         this.webClient = WebClient.builder()
-                .baseUrl(baseUrl)
-                .defaultHeader("Authorization", "Bearer " + apiKey)
+                .baseUrl(apiUrl)
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
     }
@@ -65,17 +68,35 @@ public class DeepSeekAIService {
             - "Tell me about the budget"
             """;
         
+
         try {
-            String fullPrompt = systemPrompt + "\n\nUser message: " + userMessage;
-            String response = chat(userId, fullPrompt).trim().toUpperCase();
-            
-            // Ensure we only get RETRIEVE or CHAT
-            if (response.contains("RETRIEVE")) {
-                return "RETRIEVE";
+            Map<String, Object> request = Map.of(
+                    "model", chatModel,
+                    "messages", List.of(
+                            Map.of("role", "system", "content", systemPrompt),
+                            Map.of("role", "user", "content", userMessage)
+                    ),
+                    "temperature", 0.0
+            );
+
+            Map<String, Object> response = webClient.post()
+                    .uri("/chat/completions")   // ✅ uses correct DeepSeek base URL
+                    .bodyValue(request)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .timeout(Duration.ofSeconds(15))
+                    .block();
+
+            if (response == null) {
+                logger.warn("Intent classifier: null response, defaulting to CHAT");
+                return "CHAT";
             }
-            return "CHAT";
+
+            String reply = extractReply(response).trim().toUpperCase();
+            return reply.contains("RETRIEVE") ? "RETRIEVE" : "CHAT";
+
         } catch (Exception e) {
-            System.err.println("Error classifying intent, defaulting to CHAT: " + e.getMessage());
+            logger.error("Error classifying intent, defaulting to CHAT", e);
             return "CHAT";
         }
     }

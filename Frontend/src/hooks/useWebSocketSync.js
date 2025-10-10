@@ -1,12 +1,13 @@
 import { useEffect } from 'react';
 import { useWebSocket } from './useWebSocket';
 import { useChat } from '../context/ChatContext';
+import { getWsUrl } from '../utils/apiHelpers';
 
 export const useWebSocketSync = () => {
   const { addMessage, setConnection } = useChat();
   
   const { isConnected, lastMessage, error } = useWebSocket(
-    `ws://localhost:8080/ws/chat?userId=frontend-user`,
+    getWsUrl(`/ws/chat?userId=frontend-user`),
     {
       onMessage: (data) => {
         console.log('Received WebSocket message:', data);
