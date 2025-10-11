@@ -20,6 +20,14 @@ A comprehensive AI-powered chatbot system that integrates WhatsApp messaging wit
 - **Message History**: Persistent chat history
 - **Responsive Design**: Works on desktop and mobile
 
+### Demo Image
+<img width="1918" height="1027" alt="Image" src="https://github.com/user-attachments/assets/cae90617-171b-4e02-a6dd-1eeb8615a892" />
+<img width="1157" height="811" alt="Image" src="https://github.com/user-attachments/assets/cf74c419-9221-431b-b94d-616e3365e596" />
+<img width="1146" height="795" alt="Image" src="https://github.com/user-attachments/assets/e3761dd7-a454-472e-8af9-0e56ff018b60" />
+<img width="1138" height="796" alt="Image" src="https://github.com/user-attachments/assets/9a92bc38-0d3b-47ca-8db1-e0ecf6f734ce" />
+<img width="1465" height="947" alt="Image" src="https://github.com/user-attachments/assets/5db41e9d-6c59-4885-9ccd-f2ac6fdd3f6e" />
+<img width="1142" height="800" alt="Image" src="https://github.com/user-attachments/assets/5c07ee6c-1938-4760-8491-bca220ceb6c4" />
+
 ## Architecture
 
 ```
